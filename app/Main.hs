@@ -48,19 +48,11 @@ main = do
   case result of
     Left err -> putStrLn $ "Error: " ++ show err
     Right parsedCsv -> do
-      -- Debug: Print the raw CSV to verify its structure
-      putStrLn "Raw CSV Data:"
-      mapM_ print parsedCsv
-
       -- Skip the header (assuming the first row is the header)
       let records = mapMaybe parseRecord (tail parsedCsv)
-      
-      -- Debug: Print parsed records to verify correct parsing
-      putStrLn "\nParsed records:"
-      print records
 
       -- Calculate the ratio
       let ratio = calculateRatio records
 
-      -- Print the result
-      putStrLn $ "\nRatio of COVID beds to total beds: " ++ show ratio
+      -- Print only the ratio result
+      putStrLn $ "Ratio of COVID beds to total beds: " ++ show ratio
