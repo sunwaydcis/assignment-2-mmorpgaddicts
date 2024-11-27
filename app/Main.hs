@@ -1,36 +1,66 @@
 module Main where
 
-import Data.Csv
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.Vector as V
+import Text.CSV
+import Data.Maybe (mapMaybe)
+import System.IO (hSetEncoding, stdout, utf8)
 
 -- Define a data type to hold the hospital bed information
 data HospitalRecord = HospitalRecord
-  { totalBeds   :: Int
-  , covidBeds   :: Int
+  { totalBeds   :: Int  -- Total number of beds
+  , covidBeds   :: Int  -- Number of COVID-specific beds
   } deriving (Show)
 
--- Instance to parse CSV into HospitalRecord
-instance FromNamedRecord HospitalRecord where
-  parseNamedRecord r = HospitalRecord 
-    <$> r .: "beds" 
-    <*> r .: "beds_covid"
+-- Function to parse a row into a HospitalRecord
+parseRecord :: [String] -> Maybe HospitalRecord
+parseRecord row = 
+  case row of
+    -- Match columns by their headers (order matters)
+    [_, _, total, covid, _, _, _, _, _, _, _, _, _, _] -> 
+      case (readMaybe total, readMaybe covid) of
+        (Just t, Just c) -> Just $ HospitalRecord { totalBeds = t, covidBeds = c }
+        _ -> Nothing  -- Return Nothing if parsing fails
+    _ -> Nothing  -- Return Nothing if row doesn't match the expected format
+
+-- Function to calculate the ratio of COVID beds to total beds
+calculateRatio :: [HospitalRecord] -> Double
+calculateRatio records =
+  let totalBedsSum = sum $ map totalBeds records  -- Sum of total beds
+      covidBedsSum = sum $ map covidBeds records  -- Sum of COVID beds
+  in if totalBedsSum == 0 
+       then 0 
+       else fromIntegral covidBedsSum / fromIntegral totalBedsSum
+
+-- Safe read for Maybe Int
+readMaybe :: String -> Maybe Int
+readMaybe str = case reads str of
+  [(val, "")] -> Just val  -- Successfully parsed an Int
+  _ -> Nothing             -- Parsing failed
 
 main :: IO ()
 main = do
-  -- Load the CSV file (converted from Excel to CSV before running this)
-  csvData <- BL.readFile "hospital.csv"
+  -- Set the encoding to UTF-8 to handle any special characters
+  hSetEncoding stdout utf8
+  
+  -- Load the CSV file
+  let filePath = "app/hospital.csv"  -- Path to the uploaded file
+  result <- parseCSVFromFile filePath
+  
+  case result of
+    Left err -> putStrLn $ "Error: " ++ show err
+    Right parsedCsv -> do
+      -- Debug: Print the raw CSV to verify its structure
+      putStrLn "Raw CSV Data:"
+      mapM_ print parsedCsv
 
-  case decodeByName csvData of
-    Left err -> putStrLn $ "Error: " ++ err
-    Right (_, records) -> do
-      let hospitalRecords = V.toList records
+      -- Skip the header (assuming the first row is the header)
+      let records = mapMaybe parseRecord (tail parsedCsv)
+      
+      -- Debug: Print parsed records to verify correct parsing
+      putStrLn "\nParsed records:"
+      print records
 
-          -- Sum total beds and COVID-19 beds
-          totalBedsSum = sum $ map totalBeds hospitalRecords
-          covidBedsSum = sum $ map covidBeds hospitalRecords
+      -- Calculate the ratio
+      let ratio = calculateRatio records
 
-          -- Compute the ratio
-          ratio = fromIntegral covidBedsSum / fromIntegral totalBedsSum :: Double
-
-      putStrLn $ "Ratio of beds dedicated to COVID-19: " ++ show ratio
+      -- Print the result
+      putStrLn $ "\nRatio of COVID beds to total beds: " ++ show ratio
