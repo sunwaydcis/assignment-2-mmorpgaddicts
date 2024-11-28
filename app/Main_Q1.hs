@@ -1,23 +1,24 @@
 module Main where
 
 import Data.List.Split (splitOn)
-import Data.List (groupBy, sortOn, maximumBy)
-import Data.Maybe (mapMaybe)
-import Text.Read (readMaybe)
-import Data.Ord (comparing)
 
--- Main function to execute the program
--- @NOTES We have to follow the proper structure (Input, Process, Output)
 main :: IO ()
-main = fetchData >>= \input -> do
-    let (averages, stateWithMostBeds) = process input
-    printOutput averages stateWithMostBeds
+main = do
+    input <- fetchData
+    let formattedData = formatData input
+    putStrLn "Formatted Data (State, Beds, PUI, COVID, Total):"
+    mapM_ print formattedData
 
--- Read the data from the hospital CSV file and print it
+-- Fetches the data from the hospital CSV file
 fetchData :: IO String
-fetchData = do
-    content <- readFile "data/hospital.csv"
-    putStrLn "Raw data from hospital.csv:"
-    putStrLn content
-    return content
+fetchData = readFile "data/hospital.csv"
 
+-- Formats raw CSV data
+formatData :: String -> [[String]]
+formatData raw =
+    let 
+        rows = lines raw           -- Splits into rows
+        rawData = drop 1 rows      -- Drops the header row
+        splitRows = map (splitOn ",") rawData -- Splits each row by commas
+    in 
+        splitRows
